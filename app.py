@@ -110,26 +110,32 @@ elif menu == "Reports Dashboard":
             expenses["date"] = pd.to_datetime(expenses["date"])
 
         # ---------------------------
-        # KPI Metrics (Overall)
-        # ---------------------------
-        total_income = daily["income"].sum() if not daily.empty else 0
-        total_expense = expenses["amount"].sum() if not expenses.empty else 0
-        net_profit = total_income - total_expense
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("💵 Total Income", f"₹{total_income:,.2f}")
-        col2.metric("💸 Total Expense", f"₹{total_expense:,.2f}")
-        col3.metric("📈 Net Profit", f"₹{net_profit:,.2f}")
-
-        st.divider()
-
-        # ---------------------------
-        # Combine for trend analysis
+        # Combine data
         # ---------------------------
         income_df = daily.groupby("date")["income"].sum().reset_index()
         expense_df = expenses.groupby("date")["amount"].sum().reset_index()
         combined = pd.merge(income_df, expense_df, on="date", how="outer").fillna(0)
         combined["profit"] = combined["income"] - combined["amount"]
+
+        # ---------------------------
+        # KPI Metrics (Weekly & Monthly)
+        # ---------------------------
+        combined["week"] = combined["date"].dt.to_period("W").apply(lambda r: r.start_time)
+        combined["month"] = combined["date"].dt.to_period("M").apply(lambda r: r.start_time)
+
+        weekly = combined.groupby("week")[["income", "amount", "profit"]].sum().reset_index()
+        monthly = combined.groupby("month")[["income", "amount", "profit"]].sum().reset_index()
+
+        latest_week = weekly.iloc[-1] if not weekly.empty else {"income": 0, "amount": 0, "profit": 0}
+        latest_month = monthly.iloc[-1] if not monthly.empty else {"income": 0, "amount": 0, "profit": 0}
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("📅 Weekly Income", f"₹{latest_week['income']:,.2f}")
+        c2.metric("💸 Weekly Expense", f"₹{latest_week['amount']:,.2f}")
+        c3.metric("🗓️ Monthly Income", f"₹{latest_month['income']:,.2f}")
+        c4.metric("💰 Monthly Expense", f"₹{latest_month['amount']:,.2f}")
+
+        st.divider()
 
         # ---------------------------
         # Line Chart: Income vs Expense over time
@@ -151,13 +157,6 @@ elif menu == "Reports Dashboard":
         # ---------------------------
         st.subheader("📆 Weekly & Monthly Profit and Loss")
 
-        combined["week"] = combined["date"].dt.to_period("W").apply(lambda r: r.start_time)
-        combined["month"] = combined["date"].dt.to_period("M").apply(lambda r: r.start_time)
-
-        weekly = combined.groupby("week")[["income", "amount", "profit"]].sum().reset_index()
-        monthly = combined.groupby("month")[["income", "amount", "profit"]].sum().reset_index()
-
-        # Weekly Chart
         week_fig = px.bar(
             weekly,
             x="week",
@@ -168,7 +167,6 @@ elif menu == "Reports Dashboard":
         )
         st.plotly_chart(week_fig, use_container_width=True)
 
-        # Monthly Chart
         month_fig = px.bar(
             monthly,
             x="month",
