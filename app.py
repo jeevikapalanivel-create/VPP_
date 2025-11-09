@@ -14,7 +14,10 @@ st.set_page_config(page_title="பூமி நகர்த்தி கண்�
 st.title("🚜 VPP எர்த்மூவர் வணிக மேலாண்மை")
 
 # Sidebar navigation
-menu = st.sidebar.selectbox("📂 பிரிவு தேர்வு செய்யவும்", ["புதிய இயந்திரம்", "நாள் வேலை விவரம்", "செலவு சேர்க்க", "அறிக்கை டாஷ்போர்ட்"])
+menu = st.sidebar.selectbox(
+    "📂 பிரிவு தேர்வு செய்யவும்",
+    ["புதிய இயந்திரம்", "நாள் வேலை விவரம்", "செலவு சேர்க்க", "அறிக்கை டாஷ்போர்ட்", "🗑️ தரவு நீக்கு"]
+)
 
 # ------------------------------------------------
 # ADD MACHINE
@@ -103,19 +106,16 @@ elif menu == "அறிக்கை டாஷ்போர்ட்":
     if daily.empty and expenses.empty:
         st.info("ℹ️ தரவு இல்லை. முதலில் வேலை அல்லது செலவு சேர்க்கவும்.")
     else:
-        # Convert to datetime
         if not daily.empty:
             daily["date"] = pd.to_datetime(daily["date"])
         if not expenses.empty:
             expenses["date"] = pd.to_datetime(expenses["date"])
 
-        # Combine data
         income_df = daily.groupby("date")["income"].sum().reset_index()
         expense_df = expenses.groupby("date")["amount"].sum().reset_index()
         combined = pd.merge(income_df, expense_df, on="date", how="outer").fillna(0)
         combined["profit"] = combined["income"] - combined["amount"]
 
-        # Weekly & Monthly aggregation
         combined["week"] = combined["date"].dt.to_period("W").apply(lambda r: r.start_time)
         combined["month"] = combined["date"].dt.to_period("M").apply(lambda r: r.start_time)
 
@@ -125,7 +125,6 @@ elif menu == "அறிக்கை டாஷ்போர்ட்":
         latest_week = weekly.iloc[-1] if not weekly.empty else {"income": 0, "amount": 0, "profit": 0}
         latest_month = monthly.iloc[-1] if not monthly.empty else {"income": 0, "amount": 0, "profit": 0}
 
-        # ---- Highlighted Profit/Loss Cards ----
         st.markdown("## 💹 வார & மாத இலாப / நட்ட அறிக்கை")
 
         def profit_card(title, value):
@@ -148,7 +147,6 @@ elif menu == "அறிக்கை டாஷ்போர்ட்":
 
         st.divider()
 
-        # KPI Metrics
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("📅 வார வருமானம்", f"₹{latest_week['income']:,.2f}")
         c2.metric("💸 வார செலவு", f"₹{latest_week['amount']:,.2f}")
@@ -157,12 +155,10 @@ elif menu == "அறிக்கை டாஷ்போர்ட்":
 
         st.divider()
 
-        # Line Chart
         st.subheader("📅 வருமானம் vs செலவு - காலத்தின் அடிப்படையில்")
         line_fig = px.line(combined, x="date", y=["income", "amount"], labels={"value": "₹ தொகை", "variable": "வகை"}, title="வருமானம் மற்றும் செலவு ஒப்பீடு")
         st.plotly_chart(line_fig, use_container_width=True)
 
-        # Weekly and Monthly Profit Trend
         st.subheader("📆 வார & மாத இலாப போக்கு")
         week_fig = px.bar(weekly, x="week", y="profit", color="profit", text_auto=".2s", title="வார இலாப / நட்ட போக்கு")
         month_fig = px.bar(monthly, x="month", y="profit", color="profit", text_auto=".2s", title="மாத இலாப / நட்ட போக்கு")
@@ -170,7 +166,6 @@ elif menu == "அறிக்கை டாஷ்போர்ட்":
         st.plotly_chart(week_fig, use_container_width=True)
         st.plotly_chart(month_fig, use_container_width=True)
 
-        # Comparison Summary
         st.subheader("📈 ஒப்பீட்டு சுருக்கம்")
         if len(weekly) >= 2:
             current_week, prev_week = weekly.iloc[-1]["profit"], weekly.iloc[-2]["profit"]
@@ -192,7 +187,6 @@ elif menu == "அறிக்கை டாஷ்போர்ட்":
 
         st.divider()
 
-        # Machine-wise Charts
         st.subheader("🚜 இயந்திர வாரியாக வருமானம் மற்றும் செலவு")
         if not daily.empty:
             income_chart = px.bar(daily.groupby("machine_id")["income"].sum().reset_index(), x="machine_id", y="income", color="machine_id", text_auto=".2s", title="இயந்திர வாரியாக வருமானம்")
@@ -201,7 +195,6 @@ elif menu == "அறிக்கை டாஷ்போர்ட்":
             expense_chart = px.bar(expenses.groupby("machine_id")["amount"].sum().reset_index(), x="machine_id", y="amount", color="machine_id", text_auto=".2s", title="இயந்திர வாரியாக செலவு")
             st.plotly_chart(expense_chart, use_container_width=True)
 
-        # Raw Data
         with st.expander("📄 மூல தரவு பார்க்க"):
             st.write("### நாள் வேலை தரவு")
             st.dataframe(daily)
@@ -209,3 +202,50 @@ elif menu == "அறிக்கை டாஷ்போர்ட்":
             st.dataframe(expenses)
 
         st.caption("📘 குறிப்பு: பக்கப்பட்டியைப் பயன்படுத்தி புதிய தரவைச் சேர்க்கலாம் அல்லது டாஷ்போர்ட்டை புதுப்பிக்கலாம்.")
+
+# ------------------------------------------------
+# DELETE DATA SECTION
+# ------------------------------------------------
+elif menu == "🗑️ தரவு நீக்கு":
+    st.subheader("🗑️ தவறான தரவு நீக்கு")
+
+    conn = get_conn()
+    delete_type = st.radio("எந்த தரவை நீக்க விரும்புகிறீர்கள்?", ["நாள் வேலை", "செலவு", "இயந்திரம்"])
+
+    if delete_type == "நாள் வேலை":
+        df = pd.read_sql("SELECT id, date, machine_id, hours_worked, income FROM daily_usage", conn)
+        if df.empty:
+            st.info("தரவு இல்லை.")
+        else:
+            st.dataframe(df)
+            del_id = st.number_input("நீக்க வேண்டிய ID ஐ உள்ளிடவும்", min_value=1)
+            if st.button("நாள் வேலை நீக்கு"):
+                conn.execute("DELETE FROM daily_usage WHERE id = ?", (del_id,))
+                conn.commit()
+                st.success("✅ நாள் வேலை தரவு நீக்கப்பட்டது!")
+
+    elif delete_type == "செலவு":
+        df = pd.read_sql("SELECT id, date, machine_id, expense_type, amount FROM expenses", conn)
+        if df.empty:
+            st.info("தரவு இல்லை.")
+        else:
+            st.dataframe(df)
+            del_id = st.number_input("நீக்க வேண்டிய ID ஐ உள்ளிடவும்", min_value=1)
+            if st.button("செலவு தரவு நீக்கு"):
+                conn.execute("DELETE FROM expenses WHERE id = ?", (del_id,))
+                conn.commit()
+                st.success("✅ செலவு தரவு நீக்கப்பட்டது!")
+
+    else:
+        df = pd.read_sql("SELECT * FROM machines", conn)
+        if df.empty:
+            st.info("தரவு இல்லை.")
+        else:
+            st.dataframe(df)
+            del_machine = st.text_input("நீக்க வேண்டிய இயந்திர ID ஐ உள்ளிடவும்")
+            if st.button("இயந்திரம் நீக்கு"):
+                conn.execute("DELETE FROM machines WHERE machine_id = ?", (del_machine,))
+                conn.commit()
+                st.success("✅ இயந்திரம் நீக்கப்பட்டது!")
+
+    conn.close()
